@@ -19,10 +19,13 @@ async fn main() {
 }
 
 fn init_tracer() {
+    // with tonic you can use http://0.0.0.0:4318/
+    // with http you can use http://0.0.0.0:4318/v1/traces
+
     // First, create a OTLP exporter builder. Configure it as you need.
     let otlp_exporter = opentelemetry_otlp::new_exporter()
-        .tonic()
-        .with_endpoint("http://0.0.0.0:4317");
+        .http()
+        .with_endpoint("http://127.0.0.1:4318/v1/traces");
     // Then pass it into pipeline
 
     opentelemetry_otlp::new_pipeline()
