@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use opentelemetry::{
     global,
@@ -25,7 +25,15 @@ fn init_tracer() {
     // First, create a OTLP exporter builder. Configure it as you need.
     let otlp_exporter = opentelemetry_otlp::new_exporter()
         .http()
-        .with_endpoint("http://127.0.0.1:4318/v1/traces");
+        .with_endpoint("http://0.0.0.0:8000/api/v1/traces")
+        .with_headers(HashMap::from([
+            (
+                "Authorization".to_owned(),
+                "Basic YWRtaW46YWRtaW4=".to_owned(),
+            ),
+            ("X-P-Stream".to_owned(), "oteltrace".to_owned()),
+        ]));
+
     // Then pass it into pipeline
 
     opentelemetry_otlp::new_pipeline()
@@ -50,11 +58,10 @@ fn do_work() {
         );
         span.set_attribute(ANOTHER_KEY.string("yes"));
 
-        tracer.in_span("Sub operation...", |cx| {
+        tracer.in_span("sub_operation", |cx| {
             let span = cx.span();
+            span.add_event("Sub span event", vec![Key::new("bogons").i64(100)]);
             span.set_attribute(LEMONS_KEY.string("five"));
-
-            span.add_event("Sub span event", vec![]);
         });
     });
 }
