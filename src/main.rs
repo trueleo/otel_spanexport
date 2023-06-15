@@ -1,8 +1,8 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, env, time::Duration};
 
 use opentelemetry::{
     global,
-    trace::{TraceContextExt, Tracer},
+    trace::{Span, Status, Tracer},
     Key,
 };
 use opentelemetry_otlp::WithExportConfig;
@@ -14,18 +14,21 @@ async fn main() {
 
     loop {
         do_work();
-        sleep(Duration::from_secs(10)).await;
+        sleep(Duration::from_secs(5)).await;
     }
 }
 
 fn init_tracer() {
+    let endpoint =
+        env::var("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT").expect("Requires exporter endpoint");
+
     // with tonic you can use http://0.0.0.0:4318/
     // with http you can use http://0.0.0.0:4318/v1/traces
 
     // First, create a OTLP exporter builder. Configure it as you need.
     let otlp_exporter = opentelemetry_otlp::new_exporter()
         .http()
-        .with_endpoint("http://0.0.0.0:8000/api/v1/traces")
+        .with_endpoint(endpoint)
         .with_headers(HashMap::from([
             (
                 "Authorization".to_owned(),
@@ -35,7 +38,6 @@ fn init_tracer() {
         ]));
 
     // Then pass it into pipeline
-
     opentelemetry_otlp::new_pipeline()
         .tracing()
         .with_exporter(otlp_exporter)
@@ -49,19 +51,13 @@ const ANOTHER_KEY: Key = Key::from_static_str("ex.com/another");
 // Example function to be instrumented
 fn do_work() {
     let tracer = global::tracer("ex.com/basic");
+    let mut span = tracer.start("operation");
+    span.add_event("Started!".to_string(), vec![Key::new("value").i64(100)]);
+    span.set_attribute(ANOTHER_KEY.string("yes"));
+    span.set_attribute(LEMONS_KEY.string("five"));
+    span.set_status(Status::Ok);
 
-    tracer.in_span("operation", |cx| {
-        let span = cx.span();
-        span.add_event(
-            "Nice operation!".to_string(),
-            vec![Key::new("bogons").i64(100)],
-        );
-        span.set_attribute(ANOTHER_KEY.string("yes"));
+    // perform some operation
 
-        tracer.in_span("sub_operation", |cx| {
-            let span = cx.span();
-            span.add_event("Sub span event", vec![Key::new("bogons").i64(100)]);
-            span.set_attribute(LEMONS_KEY.string("five"));
-        });
-    });
+    span.end()
 }
